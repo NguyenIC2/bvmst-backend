@@ -1,7 +1,7 @@
 const express = require("express");
 const mysql = require("mysql2");
 const jwt = require("jsonwebtoken");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 const authMiddleware = require("./middleware");
 
 const app = express();
@@ -178,6 +178,5 @@ app.delete("/cancel/:id", authMiddleware, (req, res) => {
 });
 
 // ===== RUN =====
-app.listen(3000, () => {
-  console.log("Server chạy cổng 3000");
-});
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log("Server running"));
