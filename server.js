@@ -1,31 +1,47 @@
 const express = require("express");
 const mysql = require("mysql2");
+const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-const authMiddleware = require("./middleware");
 
 const app = express();
-app.use(express.json());
 
 // ===== CONFIG =====
 const SECRET = "secret123";
 
-// ===== DB (SỬA CHUẨN) =====
+// ===== MIDDLEWARE =====
+app.use(cors()); // 🔥 FIX CORS
+app.use(express.json());
+
+// ===== DB CONNECT =====
 const db = mysql.createConnection({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASS,
   database: process.env.DB_NAME,
-  port: process.env.DB_PORT
+  port: process.env.DB_PORT,
 });
 
 db.connect(err => {
   if (err) {
-    console.error("❌ Lỗi kết nối DB:", err);
+    console.log("❌ DB lỗi:", err);
   } else {
     console.log("✅ MySQL Connected");
   }
 });
+
+// ===== AUTH MIDDLEWARE =====
+function auth(req, res, next) {
+  const token = req.headers["authorization"]?.split(" ")[1];
+
+  if (!token) return res.status(401).json({ message: "No token" });
+
+  jwt.verify(token, SECRET, (err, user) => {
+    if (err) return res.status(403).json({ message: "Token sai" });
+    req.user = user;
+    next();
+  });
+}
 
 // ===== ROOT =====
 app.get("/", (req, res) => {
@@ -46,7 +62,10 @@ app.post("/register", async (req, res) => {
     "INSERT INTO users (name, phone, password, role) VALUES (?, ?, ?, 'patient')",
     [name, phone, hashed],
     err => {
-      if (err) return res.json({ message: "Lỗi đăng ký" });
+      if (err) {
+        console.log(err);
+        return res.json({ message: "Lỗi đăng ký" });
+      }
       res.json({ message: "Đăng ký thành công" });
     }
   );
@@ -67,6 +86,7 @@ app.post("/login", (req, res) => {
       }
 
       const user = result[0];
+
       const match = await bcrypt.compare(password, user.password);
 
       if (!match) {
@@ -74,12 +94,12 @@ app.post("/login", (req, res) => {
       }
 
       const token = jwt.sign({ id: user.id }, SECRET, {
-        expiresIn: "1h"
+        expiresIn: "1h",
       });
 
       res.json({
         message: "Đăng nhập thành công",
-        token
+        token,
       });
     }
   );
@@ -94,7 +114,7 @@ app.get("/slots", (req, res) => {
 });
 
 // ===== BOOK =====
-app.post("/book", authMiddleware, (req, res) => {
+app.post("/book", auth, (req, res) => {
   const { time_slot_id } = req.body;
   const userId = req.user.id;
 
@@ -131,15 +151,15 @@ app.post("/book", authMiddleware, (req, res) => {
 });
 
 // ===== MY APPOINTMENTS =====
-app.get("/my-appointments", authMiddleware, (req, res) => {
+app.get("/my-appointments", auth, (req, res) => {
   const userId = req.user.id;
 
   db.query(
     `SELECT 
-        a.id,
-        t.date,
-        t.time_start,
-        t.time_end
+      a.id,
+      t.date,
+      t.time_start,
+      t.time_end
      FROM appointments a
      JOIN time_slots t ON a.time_slot_id = t.id
      WHERE a.user_id = ?`,
@@ -152,15 +172,13 @@ app.get("/my-appointments", authMiddleware, (req, res) => {
 });
 
 // ===== CANCEL =====
-app.delete("/cancel/:id", authMiddleware, (req, res) => {
+app.delete("/cancel/:id", auth, (req, res) => {
   const id = req.params.id;
 
   db.query(
     "SELECT * FROM appointments WHERE id = ?",
     [id],
     (err, result) => {
-      if (err) return res.json(err);
-
       if (result.length === 0) {
         return res.json({ message: "Không tìm thấy lịch" });
       }
@@ -182,5 +200,8 @@ app.delete("/cancel/:id", authMiddleware, (req, res) => {
 });
 
 // ===== RUN =====
-const PORT = process.env.PORT || 10000; // Render dùng 10000
-app.listen(PORT, () => console.log("🚀 Server running on port", PORT));
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log("🚀 Server running on port " + PORT);
+});
