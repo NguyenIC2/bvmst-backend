@@ -146,6 +146,16 @@ app.post("/book", auth, (req, res) => {
           res.json({ message: "Đặt lịch thành công" });
         }
       );
+              app.post("/cancel", authenticateToken, async (req, res) => {
+          const { time_slot_id } = req.body;
+
+          await db.query(
+            "UPDATE time_slots SET is_booked = 0 WHERE id = $1",
+            [time_slot_id]
+          );
+
+          res.json({ message: "Đã hủy lịch thành công" });
+        });
     }
   );
 });
