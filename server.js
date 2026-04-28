@@ -10,11 +10,8 @@ app.use(express.json());
 // ===== CONFIG =====
 const SECRET = "secret123";
 
-// ===== DB =====
+// ===== DB (SỬA CHUẨN) =====
 const db = mysql.createConnection({
-const mysql = require('mysql2');
-
-const connection = mysql.createConnection({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASS,
@@ -22,12 +19,12 @@ const connection = mysql.createConnection({
   port: process.env.DB_PORT
 });
 
-module.exports = connection;
-});
-
 db.connect(err => {
-  if (err) throw err;
-  console.log("MySQL Connected");
+  if (err) {
+    console.error("❌ Lỗi kết nối DB:", err);
+  } else {
+    console.log("✅ MySQL Connected");
+  }
 });
 
 // ===== ROOT =====
@@ -70,7 +67,6 @@ app.post("/login", (req, res) => {
       }
 
       const user = result[0];
-
       const match = await bcrypt.compare(password, user.password);
 
       if (!match) {
@@ -163,6 +159,8 @@ app.delete("/cancel/:id", authMiddleware, (req, res) => {
     "SELECT * FROM appointments WHERE id = ?",
     [id],
     (err, result) => {
+      if (err) return res.json(err);
+
       if (result.length === 0) {
         return res.json({ message: "Không tìm thấy lịch" });
       }
@@ -184,5 +182,5 @@ app.delete("/cancel/:id", authMiddleware, (req, res) => {
 });
 
 // ===== RUN =====
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("Server running"));
+const PORT = process.env.PORT || 10000; // Render dùng 10000
+app.listen(PORT, () => console.log("🚀 Server running on port", PORT));
